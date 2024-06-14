@@ -56,6 +56,7 @@ class Entity:  # properties and state of physical world entity
 class Landmark(Entity):  # properties of landmark entities
     def __init__(self):
         super().__init__()
+        self.reward = 2
 
 
 class Agent(Entity):  # properties of agent entities
