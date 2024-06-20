@@ -57,6 +57,7 @@ class Landmark(Entity):  # properties of landmark entities
     def __init__(self):
         super().__init__()
         self.reward = 2
+        self.completed = False
 
 
 class Agent(Entity):  # properties of agent entities
