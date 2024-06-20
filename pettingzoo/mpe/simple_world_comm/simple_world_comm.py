@@ -239,13 +239,13 @@ class Scenario(BaseScenario):
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
         for i, landmark in enumerate(world.landmarks):
-            landmark.state.p_pos = np_random.uniform(-3, +3, world.dim_p)
+            landmark.state.p_pos = np_random.uniform(-3, +3, world.dim_p) # @todo: too lazy to change it right now, but this should be configurable
             landmark.state.p_vel = np.zeros(world.dim_p)
         for i, landmark in enumerate(world.food):
-            landmark.state.p_pos = np_random.uniform(-3, +3, world.dim_p)
+            landmark.state.p_pos = np_random.uniform(-3, +3, world.dim_p) # @todo: too lazy to change it right now, but this should be configurable
             landmark.state.p_vel = np.zeros(world.dim_p)
         for i, landmark in enumerate(world.forests):
-            landmark.state.p_pos = np_random.uniform(-3, +3, world.dim_p)
+            landmark.state.p_pos = np_random.uniform(-3, +3, world.dim_p) # @todo: too lazy to change it right now, but this should be configurable
             landmark.state.p_vel = np.zeros(world.dim_p)
 
     def benchmark_data(self, agent, world):
