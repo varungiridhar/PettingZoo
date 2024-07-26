@@ -298,26 +298,24 @@ class SimpleEnv(AECEnv):
         # update geometry and text positions
         text_line = 0
         for e, entity in enumerate(self.world.entities):
+            if "adversary" in entity.name:
+                continue
             # geometry
             x, y = entity.state.p_pos
+
+            def scale_to_camera_frame(value, axis_min, axis_max, camera_min, camera_max):
+                return (value - axis_min) / (axis_max - axis_min) * (camera_max - camera_min) + camera_min
             y *= (
                 -1
             )  # this makes the display mimic the old pyglet setup (ie. flips image)
-            x = (
-                (x / cam_range) * self.width // 2 * 0.9
-            )  # the .9 is just to keep entities from appearing "too" out-of-bounds
-            y = (y / cam_range) * self.height // 2 * 0.9
-            x += self.width // 2
-            y += self.height // 2
+            x = scale_to_camera_frame(x, -3, 3, 0, 700)
+            y = scale_to_camera_frame(y, -3, 3, 0, 700)
             pygame.draw.circle(
                 self.screen, entity.color * 200, (x, y), entity.size * 350
             )  # 350 is an arbitrary scale factor to get pygame to render similar sizes as pyglet
             pygame.draw.circle(
                 self.screen, (0, 0, 0), (x, y), entity.size * 350, 1
             )  # borders
-            assert (
-                0 < x < self.width and 0 < y < self.height
-            ), f"Coordinates {(x, y)} are out of bounds."
 
             # text
             if isinstance(entity, Agent):

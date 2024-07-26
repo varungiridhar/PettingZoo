@@ -93,6 +93,8 @@ class raw_env(SimpleEnv, EzPickle):
         num_forests=2,
         continuous_actions=False,
         render_mode=None,
+        init_agent_pos=[],
+        init_task_pos=[]
     ):
         EzPickle.__init__(
             self,
@@ -107,7 +109,7 @@ class raw_env(SimpleEnv, EzPickle):
         )
         scenario = Scenario()
         world = scenario.make_world(
-            num_good, num_adversaries, num_obstacles, num_food, num_forests
+            num_good, num_adversaries, num_obstacles, num_food, num_forests, init_agent_pos, init_task_pos
         )
         SimpleEnv.__init__(
             self,
@@ -132,6 +134,8 @@ class Scenario(BaseScenario):
         num_landmarks=1,
         num_food=2,
         num_forests=2,
+        init_agent_pos=[],
+        init_task_pos=[]
     ):
         world = World()
         # set any world properties first
@@ -145,6 +149,7 @@ class Scenario(BaseScenario):
         num_forests = num_forests
         # add agents
         world.agents = [Agent() for i in range(num_agents)]
+        good_agent_idx = 0
         for i, agent in enumerate(world.agents):
             agent.adversary = True if i < num_adversaries else False
             base_index = i - 1 if i < num_adversaries else i - num_adversaries
@@ -159,6 +164,11 @@ class Scenario(BaseScenario):
             agent.accel = 3.0 if agent.adversary else 4.0
             # agent.accel = 20.0 if agent.adversary else 25.0
             agent.max_speed = 1.0 if agent.adversary else 1.3
+            if agent.adversary:
+                agent.state.p_pos = np.array([0.0, 0.0])
+            elif len(init_agent_pos) != 0:
+                agent.state.p_pos = np.array(init_agent_pos[good_agent_idx])
+                good_agent_idx += 1
         # add landmarks
         world.landmarks = [Landmark() for i in range(num_landmarks)]
         for i, landmark in enumerate(world.landmarks):
@@ -167,13 +177,16 @@ class Scenario(BaseScenario):
             landmark.movable = False
             landmark.size = 0.2
             landmark.boundary = False
+            landmark.state.p_pos = np.random.uniform(-3, +3, (2))
         world.food = [Landmark() for i in range(num_food)]
         for i, lm in enumerate(world.food):
             lm.name = "food %d" % i
             lm.collide = False
-            lm.movable = False
+            lm.movable = True
             lm.size = 0.03
             lm.boundary = False
+            if len(init_task_pos) is not 0:
+                lm.state.p_pos = np.array(init_task_pos[i])
         world.forests = [Landmark() for i in range(num_forests)]
         for i, lm in enumerate(world.forests):
             lm.name = "forest %d" % i
@@ -233,20 +246,25 @@ class Scenario(BaseScenario):
             landmark.color = np.array([0.15, 0.15, 0.65])
         for i, landmark in enumerate(world.forests):
             landmark.color = np.array([0.6, 0.9, 0.6])
-        # set random initial states
+        # set random initial states if init_agent_pos and init_task_pos is not populated yet
         for agent in world.agents:
-            agent.state.p_pos = np_random.uniform(-1, +1, world.dim_p)
+            if agent.state.p_pos is None:
+                agent.state.p_pos = np_random.uniform(-3, 3, world.dim_p)
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
+
         for i, landmark in enumerate(world.landmarks):
-            landmark.state.p_pos = np_random.uniform(-3, +3, world.dim_p) # @todo: too lazy to change it right now, but this should be configurable
-            landmark.state.p_vel = np.zeros(world.dim_p)
+            if landmark.state.p_pos is None:
+                landmark.state.p_pos = np_random.uniform(-3, 3, world.dim_p)
+
+            landmark.state.p_vel = 2 * np.random.uniform(-1, +1, world.dim_p)
+        
         for i, landmark in enumerate(world.food):
-            landmark.state.p_pos = np_random.uniform(-3, +3, world.dim_p) # @todo: too lazy to change it right now, but this should be configurable
-            landmark.state.p_vel = np.zeros(world.dim_p)
+            if landmark.state.p_pos is None:
+                landmark.state.p_pos = np_random.uniform(-3, 3, world.dim_p)
         for i, landmark in enumerate(world.forests):
-            landmark.state.p_pos = np_random.uniform(-3, +3, world.dim_p) # @todo: too lazy to change it right now, but this should be configurable
-            landmark.state.p_vel = np.zeros(world.dim_p)
+            if landmark.state.p_pos is None:
+                landmark.state.p_pos = np_random.uniform(-3, +3, world.dim_p)
 
     def benchmark_data(self, agent, world):
         if agent.adversary:
@@ -298,54 +316,28 @@ class Scenario(BaseScenario):
         rew = 0
         shape = False
         adversaries = self.adversaries(world)
-        if shape:
-            for adv in adversaries:
-                rew += 0.1 * np.sqrt(
-                    np.sum(np.square(agent.state.p_pos - adv.state.p_pos))
-                )
-        if agent.collide:
-            for a in adversaries:
-                if self.is_collision(a, agent):
-                    rew -= 5
 
         def bound(x):
-            if x < 0.9:
+            if x < 0.5:
                 return 0
             if x < 1.0:
                 return (x - 0.9) * 10
             return min(np.exp(2 * x - 2), 10)  # 1 + (x - 1) * (x - 1)
-
-        for p in range(world.dim_p):
-            x = abs(agent.state.p_pos[p])
-            rew -= 2 * bound(x)
+        def bound(x):
+            return (x < 0.2)
 
         for food in world.food:
-            if self.is_collision(agent, food):
-                rew += 2
-        rew -= 0.05 * min(
-            np.sqrt(np.sum(np.square(food.state.p_pos - agent.state.p_pos)))
-            for food in world.food
-        )
+            dist = np.sqrt(np.sum(np.square(food.state.p_pos - agent.state.p_pos)))
+            if bound(dist):
+                rew +=10
+                food.color = np.array([0.75, 0.75, 0.75])
+        rew -= 1
 
         return rew
 
     def adversary_reward(self, agent, world):
         # Agents are rewarded based on minimum agent distance to each landmark
-        rew = 0
-        shape = True
-        agents = self.good_agents(world)
-        adversaries = self.adversaries(world)
-        if shape:
-            rew -= 0.1 * min(
-                np.sqrt(np.sum(np.square(a.state.p_pos - agent.state.p_pos)))
-                for a in agents
-            )
-        if agent.collide:
-            for ag in agents:
-                for adv in adversaries:
-                    if self.is_collision(ag, adv):
-                        rew += 5
-        return rew
+        return 0
 
     def observation2(self, agent, world):
         # get positions of all entities in this agent's reference frame

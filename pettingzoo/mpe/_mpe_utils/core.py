@@ -133,6 +133,8 @@ class World:  # multi-agent world
         # update agent state
         for agent in self.agents:
             self.update_agent_state(agent)
+        for landmark in self.landmarks:
+            self.update_landmark_state(landmark)
 
     # gather agent action forces
     def apply_action_force(self, p_force):
@@ -199,6 +201,17 @@ class World:  # multi-agent world
                 else 0.0
             )
             agent.state.c = agent.action.c + noise
+
+# @todo: branch or find some way to merge into true code
+    def update_landmark_state(self, landmark):
+        # let force be a random direction
+        force = np.random.randn(2) * 2
+        # make landmark go in random direction
+        if landmark.movable:
+            landmark.state.p_pos += landmark.state.p_vel * self.dt
+            landmark.state.p_vel = landmark.state.p_vel * (1 - self.damping)
+            landmark.state.p_vel += (force / landmark.mass) * self.dt
+
 
     # get collision forces for any contact between two entities
     def get_collision_force(self, entity_a, entity_b):
